@@ -3,49 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smile Finance AI</title>
+    <title>Smile Finance AI - Debug Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body class="bg-gray-50 flex flex-col h-screen">
-    <header class="bg-white shadow p-4 border-b-2 border-blue-600">
-        <h1 class="text-xl font-bold text-blue-700">SMILE FINANCE AI</h1>
+<body class="bg-gray-100 h-screen flex flex-col font-sans">
+
+    <header class="bg-white shadow-md p-4 flex justify-between items-center border-b-2 border-blue-600">
+        <div>
+            <h1 class="text-xl font-bold text-blue-700">SMILE FINANCE AI</h1>
+            <p class="text-[10px] text-gray-500 font-bold uppercase">Smile Finance Solution</p>
+        </div>
+        <div class="text-xs text-green-600 font-mono" id="status-indicator">● System Online</div>
     </header>
-    <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4"></main>
-    <footer class="p-4 bg-white border-t flex items-center space-x-2">
-        <input id="user-input" type="text" placeholder="Sawal poochein..." class="flex-1 p-2 border rounded-full outline-none">
-        <button id="send-btn" class="bg-blue-600 text-white p-2 rounded-full w-10 h-10"><i class="fas fa-paper-plane"></i></button>
-    </footer>
+
+    <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+        <div class="bg-blue-100 p-3 rounded-lg max-w-[85%] text-gray-800 shadow-sm border border-blue-200">
+            <b>Smile Finance AI:</b> Namaste! Kuch bhi puchiye, main check kar raha hoon ki connectivity sahi hai ya nahi.
+        </div>
+    </div>
+
+    <div class="p-4 bg-white border-t">
+        <div class="flex items-center space-x-2 bg-gray-100 rounded-full px-4 py-1 border focus-within:ring-2 focus-within:ring-blue-500">
+            <input id="user-input" type="text" placeholder="Yahan likhein..." class="flex-1 p-2 bg-transparent outline-none">
+            <button id="send-btn" class="bg-blue-600 text-white p-2 rounded-full w-10 h-10 hover:bg-blue-700 transition-all">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
     <script>
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
 
-        async function askAI(query) {
+        function addMessage(sender, text, isError = false) {
             const div = document.createElement('div');
-            div.className = "bg-gray-200 p-3 rounded-lg max-w-[80%]";
-            div.innerText = "Smile Finance AI soch raha hai...";
+            if (sender === "User") {
+                div.className = "bg-blue-600 text-white p-3 rounded-lg max-w-[85%] self-end ml-auto shadow-md mb-2";
+                div.innerHTML = `<b>Aap:</b> <br>${text}`;
+            } else {
+                div.className = isError 
+                    ? "bg-red-100 text-red-700 p-3 rounded-lg max-w-[85%] shadow-sm border border-red-200 mb-2 font-mono text-xs"
+                    : "bg-white text-gray-800 p-3 rounded-lg max-w-[85%] shadow-sm border border-gray-200 mb-2";
+                div.innerHTML = isError ? `<b>⚠️ Error Detail:</b> <br>${text}` : `<b>Smile Finance AI:</b> <br>${text}`;
+            }
             chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return div;
+        }
 
-            const res = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: query })
-            });
-            const data = await res.json();
-            div.innerText = data.reply;
+        async function askAI(query) {
+            const loadingDiv = addMessage("AI", "Smile Finance AI soch raha hai...");
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: query })
+                });
+
+                // Status Check
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    loadingDiv.remove();
+                    addMessage("AI", `Server responded with ${response.status}: ${errorText}`, true);
+                    return;
+                }
+
+                const data = await response.json();
+                loadingDiv.remove();
+                
+                if (data.reply) {
+                    addMessage("AI", data.reply);
+                } else if (data.error) {
+                    addMessage("AI", data.error, true);
+                } else {
+                    addMessage("AI", JSON.stringify(data), true);
+                }
+            } catch (error) {
+                loadingDiv.remove();
+                addMessage("AI", `Fetch failed: ${error.message}. Make sure /api/chat.js exists!`, true);
+            }
         }
 
         sendBtn.addEventListener('click', () => {
             const text = userInput.value.trim();
             if(text) {
-                const uDiv = document.createElement('div');
-                uDiv.className = "bg-blue-600 text-white p-3 rounded-lg max-w-[80%] ml-auto text-right";
-                uDiv.innerText = text;
-                chatBox.appendChild(uDiv);
+                addMessage("User", text);
                 userInput.value = "";
                 askAI(text);
             }
+        });
+
+        userInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") sendBtn.click();
         });
     </script>
 </body>
